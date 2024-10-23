@@ -1,5 +1,6 @@
 package com.example.musicapp
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -182,12 +184,20 @@ fun TrackList(tracks: List<Track>, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackItem(track: Track, onLongPress: () -> Unit) {
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
             .combinedClickable(
-                onClick = {},
+                onClick = {
+                    val intent = Intent(context, TrackDetailsActivity::class.java).apply {
+                        putExtra("track_name", track.songName)
+                        putExtra("artist_name", track.artistName)
+                    }
+                    context.startActivity(intent)
+                },
                 onLongClick = onLongPress
             ),
         verticalAlignment = Alignment.CenterVertically
