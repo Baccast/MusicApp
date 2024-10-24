@@ -43,7 +43,7 @@ import kotlin.random.Random
 
 val sampleTracks = listOf(
     Track(
-        imageURL = "https://www.nationalgeographic.com/animals/mammals/facts/domestic-cat",
+        imageURL = "https://i.natgeofe.com/n/548467d8-c5f1-4551-9f58-6817a8d2c45e/NationalGeographic_2572187_3x4.jpg",
         artistName = "Artist 1",
         songName = "Song 1"
     ),
@@ -195,6 +195,7 @@ fun TrackItem(track: Track, onLongPress: () -> Unit) {
                     val intent = Intent(context, TrackDetailsActivity::class.java).apply {
                         putExtra("track_name", track.songName)
                         putExtra("artist_name", track.artistName)
+                        putExtra("track_image_url", track.imageURL)
                     }
                     context.startActivity(intent)
                 },
