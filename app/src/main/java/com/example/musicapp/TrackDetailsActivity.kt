@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,6 +54,8 @@ class TrackDetailsActivity : ComponentActivity() {
 @Composable
 fun PlaybackScreen(trackName: String?, artistName: String?, trackImageURL: String?) {
     var isPlaying by remember { mutableStateOf(false) }
+    var trackPosition by remember { mutableStateOf(0f) }
+    var volumeLevel by remember { mutableStateOf(0.5f) }
 
     Column(
         modifier = Modifier
@@ -73,6 +76,28 @@ fun PlaybackScreen(trackName: String?, artistName: String?, trackImageURL: Strin
                 .size(200.dp)
                 .padding(16.dp),
             contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Simulate seek bar for track position
+        Text(text = "Track Position: ${trackPosition.toInt()}%", fontSize = 16.sp)
+        Slider(
+            value = trackPosition,
+            onValueChange = { trackPosition = it },
+            valueRange = 0f..100f,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Simulate volume control
+        Text(text = "Volume: ${(volumeLevel * 100).toInt()}%", fontSize = 16.sp)
+        Slider(
+            value = volumeLevel,
+            onValueChange = { volumeLevel = it },
+            valueRange = 0f..1f,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
