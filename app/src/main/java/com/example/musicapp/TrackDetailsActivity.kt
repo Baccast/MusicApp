@@ -1,5 +1,9 @@
 package com.example.musicapp
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,13 +33,26 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import coil.compose.rememberAsyncImagePainter
 import coil.compose.rememberImagePainter
 import com.example.musicapp.ui.theme.MusicAppTheme
 
 class TrackDetailsActivity : ComponentActivity() {
+
+    private var isPlaying by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                0
+            )
+        }
 
         // Receive the data passed through the Intent
         val trackName = intent.getStringExtra("track_name")
@@ -45,15 +62,54 @@ class TrackDetailsActivity : ComponentActivity() {
         setContent {
             MusicAppTheme {
                 // Display track details and playback controls
-                PlaybackScreen(trackName = trackName, artistName = artistName, trackImageURL = trackImageURL)
+                PlaybackScreen(
+                    trackName = trackName,
+                    artistName = artistName,
+                    trackImageURL = trackImageURL,
+                    isPlaying = isPlaying,
+                    onPlayPause = { togglePlayPause() }
+                )
+            }
+        }
+    }
+
+    private fun togglePlayPause() {
+        if (isPlaying) {
+            // Stop the service (stop playing)
+            Intent(this, MediaPlayerService::class.java).also { intent ->
+                intent.action = MediaPlayerService.Actions.STOP.toString()
+                startService(intent)
+            }
+        } else {
+            // Start the service (start playing)
+            Intent(this, MediaPlayerService::class.java).also { intent ->
+                    intent.action = MediaPlayerService.Actions.START.toString()
+                startService(intent)
+            }
+        }
+        isPlaying = !isPlaying
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isPlaying) {
+            // Stop the service when the activity is destroyed
+            Intent(this, MediaPlayerService::class.java).also { intent ->
+                intent.action = MediaPlayerService.ACTION_PAUSE
+                startService(intent)
             }
         }
     }
 }
 
 @Composable
-fun PlaybackScreen(trackName: String?, artistName: String?, trackImageURL: String?) {
-    var isPlaying by remember { mutableStateOf(false) }
+fun PlaybackScreen(
+    trackName: String?,
+    artistName: String?,
+    trackImageURL: String?,
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit
+) {
     var trackPosition by remember { mutableStateOf(0f) }
     var volumeLevel by remember { mutableStateOf(0.5f) }
 
@@ -68,7 +124,7 @@ fun PlaybackScreen(trackName: String?, artistName: String?, trackImageURL: Strin
         Text(text = "Artist: $artistName", fontSize = 20.sp)
 
         Spacer(modifier = Modifier.height(48.dp))
-        
+
         Image(
             painter = rememberAsyncImagePainter(model = trackImageURL),
             contentDescription = "Track Image",
@@ -114,7 +170,7 @@ fun PlaybackScreen(trackName: String?, artistName: String?, trackImageURL: Strin
                 )
             }
 
-            IconButton(onClick = { isPlaying = !isPlaying }) {
+            IconButton(onClick = { onPlayPause() }) {
                 Icon(
                     painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                     contentDescription = if (isPlaying) "Pause" else "Play",
