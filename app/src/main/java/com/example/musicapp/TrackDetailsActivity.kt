@@ -1,8 +1,15 @@
 package com.example.musicapp
 
+import Track
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -34,66 +41,168 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import coil.compose.rememberAsyncImagePainter
 import coil.compose.rememberImagePainter
 import com.example.musicapp.ui.theme.MusicAppTheme
 
 class TrackDetailsActivity : ComponentActivity() {
 
+    private lateinit var audioManager: AudioManager
+    private lateinit var trackList: List<Track>
+    private lateinit var mediaPlayer: MediaPlayer
+    private var currentIndex by mutableStateOf(0)
     private var isPlaying by mutableStateOf(false)
+    private var volumeLevel by mutableStateOf(0.5f)
+    private var trackPosition by mutableStateOf(0)
+    private var trackDuration by mutableStateOf(0)
+
+    private val playPauseReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                MediaPlayerService.ACTION_PLAY -> isPlaying = true
+                MediaPlayerService.ACTION_PAUSE -> isPlaying = false
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        volumeLevel = fetchVolumeLevel()
+        mediaPlayer = MediaPlayer()
 
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // Retrieve track list and current index from the intent
+        trackList = intent.getParcelableArrayListExtra("track_list") ?: emptyList()
+        currentIndex = intent.getIntExtra("track_index", 0)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ActivityCompat.requestPermissions(
-                this,
-                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                0
+                this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0
             )
         }
 
-        // Receive the data passed through the Intent
-        val trackName = intent.getStringExtra("track_name")
-        val artistName = intent.getStringExtra("artist_name")
-        val trackImageURL = intent.getStringExtra("track_image_url")
+        // Start MediaPlayerService with the initial track
+        Intent(this, MediaPlayerService::class.java).also { intent ->
+            intent.action = MediaPlayerService.ACTION_PLAY
+            intent.putExtra(MediaPlayerService.EXTRA_AUDIO_FILE_RES_ID, trackList[currentIndex].audioFileResId)
+            startService(intent)
+        }
 
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            playPauseReceiver,
+            IntentFilter(MediaPlayerService.ACTION_PLAY).apply {
+                addAction(MediaPlayerService.ACTION_PAUSE)
+            }
+        )
+
+        updateTrackDetails()  // Set initial track content
+        // play the track
+        togglePlayPause()
+
+        // Update track position periodically
+        updateTrackPosition()
+    }
+
+    private fun updateTrackPosition() {
+        val handler = android.os.Handler(mainLooper)
+        handler.post(object : Runnable {
+            override fun run() {
+                if (isPlaying && mediaPlayer.isPlaying) {
+                    trackPosition = mediaPlayer.currentPosition
+                    trackDuration = mediaPlayer.duration
+                    updateTrackDetails()
+                }
+                handler.postDelayed(this, 1000)
+            }
+        })
+    }
+
+    private fun adjustVolumeLevel(volumeLevel: Float) {
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val newVolume = (volumeLevel * maxVolume).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+        this.volumeLevel = volumeLevel
+    }
+
+    private fun fetchVolumeLevel(): Float {
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        return currentVolume / maxVolume.toFloat()
+    }
+
+    private fun togglePlayPause() {
+        val action = if (isPlaying) MediaPlayerService.ACTION_PAUSE else MediaPlayerService.ACTION_PLAY
+        val audioFileResId = trackList[currentIndex].audioFileResId  // Get audio resource ID of current track
+        Intent(this, MediaPlayerService::class.java).also { intent ->
+            intent.action = action
+            intent.putExtra(MediaPlayerService.EXTRA_AUDIO_FILE_RES_ID, audioFileResId)
+            startService(intent)
+        }
+        isPlaying = !isPlaying
+    }
+
+    private fun nextTrack() {
+        if (currentIndex < trackList.size - 1) {
+            currentIndex++
+            updateTrackDetails()
+
+            // Send new track info to MediaPlayerService
+            val audioFileResId = trackList[currentIndex].audioFileResId
+            Intent(this, MediaPlayerService::class.java).also { intent ->
+                intent.action = MediaPlayerService.ACTION_PLAY
+                intent.putExtra(MediaPlayerService.EXTRA_AUDIO_FILE_RES_ID, audioFileResId)
+                startService(intent)
+            }
+            isPlaying = true
+        }
+    }
+
+    private fun previousTrack() {
+        if (currentIndex > 0) {
+            currentIndex--
+            updateTrackDetails()
+
+            // Send new track info to MediaPlayerService
+            val audioFileResId = trackList[currentIndex].audioFileResId
+            Intent(this, MediaPlayerService::class.java).also { intent ->
+                intent.action = MediaPlayerService.ACTION_PLAY
+                intent.putExtra(MediaPlayerService.EXTRA_AUDIO_FILE_RES_ID, audioFileResId)
+                startService(intent)
+            }
+            isPlaying = true
+        }
+    }
+
+    private fun updateTrackDetails() {
+        val currentTrack = trackList[currentIndex]
         setContent {
             MusicAppTheme {
-                // Display track details and playback controls
                 PlaybackScreen(
-                    trackName = trackName,
-                    artistName = artistName,
-                    trackImageURL = trackImageURL,
+                    track = currentTrack,
                     isPlaying = isPlaying,
-                    onPlayPause = { togglePlayPause() }
+                    onPlayPause = { togglePlayPause() },
+                    onNextTrack = { nextTrack() },
+                    onPreviousTrack = { previousTrack() },
+                    volumeLevel = volumeLevel,
+                    onVolumeChange = { adjustVolumeLevel(it) },
+                    trackPosition = trackPosition,
+                    trackDuration = trackDuration,
+                    onSeek = { position ->
+                        if (mediaPlayer.isPlaying) {
+                            mediaPlayer.seekTo(position)
+                        }
+                    }
                 )
             }
         }
     }
 
-    private fun togglePlayPause() {
-        if (isPlaying) {
-            // Stop the service (stop playing)
-            Intent(this, MediaPlayerService::class.java).also { intent ->
-                intent.action = MediaPlayerService.Actions.STOP.toString()
-                startService(intent)
-            }
-        } else {
-            // Start the service (start playing)
-            Intent(this, MediaPlayerService::class.java).also { intent ->
-                    intent.action = MediaPlayerService.Actions.START.toString()
-                startService(intent)
-            }
-        }
-        isPlaying = !isPlaying
-    }
-
     override fun onDestroy() {
         super.onDestroy()
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(playPauseReceiver)
         if (isPlaying) {
-            // Stop the service when the activity is destroyed
             Intent(this, MediaPlayerService::class.java).also { intent ->
                 intent.action = MediaPlayerService.ACTION_PAUSE
                 startService(intent)
@@ -104,14 +213,19 @@ class TrackDetailsActivity : ComponentActivity() {
 
 @Composable
 fun PlaybackScreen(
-    trackName: String?,
-    artistName: String?,
-    trackImageURL: String?,
+    track: Track,
     isPlaying: Boolean,
-    onPlayPause: () -> Unit
+    onPlayPause: () -> Unit,
+    onNextTrack: () -> Unit,
+    onPreviousTrack: () -> Unit,
+    volumeLevel: Float,
+    onVolumeChange: (Float) -> Unit,
+    trackPosition: Int,
+    trackDuration: Int,
+    onSeek: (Int) -> Unit
 ) {
-    var trackPosition by remember { mutableStateOf(0f) }
-    var volumeLevel by remember { mutableStateOf(0.5f) }
+    val elapsedTime = formatTime(trackPosition)
+    val remainingTime = formatTime(trackDuration - trackPosition)
 
     Column(
         modifier = Modifier
@@ -119,14 +233,14 @@ fun PlaybackScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
-    ){
-        Text(text = "Track: $trackName", fontSize = 24.sp)
-        Text(text = "Artist: $artistName", fontSize = 20.sp)
+    ) {
+        Text(text = "Track: ${track.songName}", fontSize = 24.sp)
+        Text(text = "Artist: ${track.artistName}", fontSize = 20.sp)
 
         Spacer(modifier = Modifier.height(48.dp))
 
         Image(
-            painter = rememberAsyncImagePainter(model = trackImageURL),
+            painter = rememberAsyncImagePainter(model = track.imageURL),
             contentDescription = "Track Image",
             modifier = Modifier
                 .size(200.dp)
@@ -136,22 +250,29 @@ fun PlaybackScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Simulate seek bar for track position
-        Text(text = "Track Position: ${trackPosition.toInt()}%", fontSize = 16.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = elapsedTime, fontSize = 16.sp)
+            Text(text = remainingTime, fontSize = 16.sp)
+        }
+
         Slider(
-            value = trackPosition,
-            onValueChange = { trackPosition = it },
-            valueRange = 0f..100f,
+            value = trackPosition.toFloat(),
+            onValueChange = { newValue ->
+                onSeek(newValue.toInt())
+            },
+            valueRange = 0f..trackDuration.toFloat(),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Simulate volume control
         Text(text = "Volume: ${(volumeLevel * 100).toInt()}%", fontSize = 16.sp)
         Slider(
             value = volumeLevel,
-            onValueChange = { volumeLevel = it },
+            onValueChange = onVolumeChange,
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
@@ -162,15 +283,15 @@ fun PlaybackScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            IconButton(onClick = { /* Simulate previous track action */ }) {
+            IconButton(onClick = onPreviousTrack) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_skip_previous),  // Previous icon
+                    painter = painterResource(id = R.drawable.ic_skip_previous),
                     contentDescription = "Previous Track",
                     modifier = Modifier.size(48.dp)
                 )
             }
 
-            IconButton(onClick = { onPlayPause() }) {
+            IconButton(onClick = onPlayPause) {
                 Icon(
                     painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                     contentDescription = if (isPlaying) "Pause" else "Play",
@@ -178,9 +299,9 @@ fun PlaybackScreen(
                 )
             }
 
-            IconButton(onClick = { /* Simulate next track action */ }) {
+            IconButton(onClick = onNextTrack) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_skip_next),  // Next icon
+                    painter = painterResource(id = R.drawable.ic_skip_next),
                     contentDescription = "Next Track",
                     modifier = Modifier.size(48.dp)
                 )
@@ -189,4 +310,10 @@ fun PlaybackScreen(
     }
 
     Text(text = if (isPlaying) "Playing" else "Paused", fontSize = 18.sp)
+}
+
+fun formatTime(milliseconds: Int): String {
+    val minutes = (milliseconds / 1000) / 60
+    val seconds = (milliseconds / 1000) % 60
+    return String.format("%d:%02d", minutes, seconds)
 }

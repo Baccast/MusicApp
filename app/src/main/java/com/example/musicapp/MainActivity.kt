@@ -1,5 +1,6 @@
 package com.example.musicapp
 
+import Track
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -41,83 +42,99 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import com.example.musicapp.ui.theme.MusicAppTheme
+import java.util.ArrayList
 import kotlin.random.Random
 
 val sampleTracks = listOf(
     Track(
-        imageURL = "https://i.natgeofe.com/n/548467d8-c5f1-4551-9f58-6817a8d2c45e/NationalGeographic_2572187_3x4.jpg",
-        artistName = "Artist 1",
-        songName = "Song 1"
+        imageURL = "https://i.scdn.co/image/ab67616d0000b27313b3e37318a0c247b550bccd",
+        artistName = "Ed Sheeran",
+        songName = "Thinking Out Loud",
+        audioFileResId = R.raw.track1
     ),
     Track(
-        imageURL = "https://via.placeholder.com/150",
-        artistName = "Artist 2",
-        songName = "Song 2"
+        imageURL = "https://i.scdn.co/image/ab67616d0000b273346a5742374ab4cf9ed32dee",
+        artistName = "Justin Timberlake",
+        songName = "Rock Your Body",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 3",
-        songName = "Song 3"
+        songName = "Song 3",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 4",
-        songName = "Song 4"
+        songName = "Song 4",
+        audioFileResId = R.raw.track2
     ),
     Track(
-        imageURL = "https://via.placeholder.com/150",
+        imageURL = "https://i.scdn.co/image/ab67616d0000b273346a5742374ab4cf9ed32dee",
         artistName = "Artist 5",
-        songName = "Song 5"
+        songName = "Song 5",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 6",
-        songName = "Song 6"
+        songName = "Song 6",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 7",
-        songName = "Song 7"
+        songName = "Song 7",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 8",
-        songName = "Song 8"
+        songName = "Song 8",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 9",
-        songName = "Song 9"
+        songName = "Song 9",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 10",
-        songName = "Song 10"
+        songName = "Song 10",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 11",
-        songName = "Song 11"
+        songName = "Song 11",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 12",
-        songName = "Song 12"
+        songName = "Song 12",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 13",
-        songName = "Song 13"
+        songName = "Song 13",
+        audioFileResId = R.raw.track2
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 14",
-        songName = "Song 14"
+        songName = "Song 14",
+        audioFileResId = R.raw.track1
     ),
     Track(
         imageURL = "https://via.placeholder.com/150",
         artistName = "Artist 15",
-        songName = "Song 15"
+        songName = "Song 15",
+        audioFileResId = R.raw.track2
     ),
 )
 
@@ -168,6 +185,8 @@ fun TrackList(tracks: List<Track>, modifier: Modifier = Modifier) {
             items(tracks) { track ->
                 TrackItem(
                     track = track,
+                    trackList = tracks,
+                    currentIndex = tracks.indexOf(track),
                     onLongPress = {
                         trackToDelete = track
                         showDialog = true
@@ -193,7 +212,7 @@ fun TrackList(tracks: List<Track>, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrackItem(track: Track, onLongPress: () -> Unit) {
+fun TrackItem(track: Track, trackList: List<Track>, currentIndex: Int, onLongPress: () -> Unit) {
     val context = LocalContext.current
 
     Row(
@@ -206,6 +225,8 @@ fun TrackItem(track: Track, onLongPress: () -> Unit) {
                         putExtra("track_name", track.songName)
                         putExtra("artist_name", track.artistName)
                         putExtra("track_image_url", track.imageURL)
+                        putParcelableArrayListExtra("track_list", ArrayList(trackList))  // Pass the list
+                        putExtra("track_index", currentIndex)  // Pass the current index
                     }
                     context.startActivity(intent)
                 },
