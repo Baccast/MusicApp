@@ -62,6 +62,10 @@ class TrackDetailsActivity : ComponentActivity() {
             when (intent.action) {
                 MediaPlayerService.ACTION_PLAY -> isPlaying = true
                 MediaPlayerService.ACTION_PAUSE -> isPlaying = false
+                MediaPlayerService.ACTION_UPDATE_PROGRESS -> {
+                    trackPosition = intent.getIntExtra(MediaPlayerService.EXTRA_TRACK_POSITION, 0)
+                    trackDuration = intent.getIntExtra(MediaPlayerService.EXTRA_TRACK_DURATION, 0)
+                }
             }
         }
     }
@@ -83,6 +87,16 @@ class TrackDetailsActivity : ComponentActivity() {
             )
         }
 
+        // Register the play/pause and progress update receiver
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            playPauseReceiver,
+            IntentFilter().apply {
+                addAction(MediaPlayerService.ACTION_PLAY)
+                addAction(MediaPlayerService.ACTION_PAUSE)
+                addAction(MediaPlayerService.ACTION_UPDATE_PROGRESS)
+            }
+        )
+
         // Start MediaPlayerService with the initial track
         Intent(this, MediaPlayerService::class.java).also { intent ->
             intent.action = MediaPlayerService.ACTION_PLAY
@@ -100,23 +114,6 @@ class TrackDetailsActivity : ComponentActivity() {
         updateTrackDetails()  // Set initial track content
         // play the track
         togglePlayPause()
-
-        // Update track position periodically
-        updateTrackPosition()
-    }
-
-    private fun updateTrackPosition() {
-        val handler = android.os.Handler(mainLooper)
-        handler.post(object : Runnable {
-            override fun run() {
-                if (isPlaying && mediaPlayer.isPlaying) {
-                    trackPosition = mediaPlayer.currentPosition
-                    trackDuration = mediaPlayer.duration
-                    updateTrackDetails()
-                }
-                handler.postDelayed(this, 1000)
-            }
-        })
     }
 
     private fun adjustVolumeLevel(volumeLevel: Float) {
@@ -190,8 +187,10 @@ class TrackDetailsActivity : ComponentActivity() {
                     trackPosition = trackPosition,
                     trackDuration = trackDuration,
                     onSeek = { position ->
-                        if (mediaPlayer.isPlaying) {
-                            mediaPlayer.seekTo(position)
+                        Intent(this, MediaPlayerService::class.java).also { intent ->
+//                            intent.action = MediaPlayerService.ACTION_SEEK
+//                            intent.putExtra(MediaPlayerService.EXTRA_SEEK_POSITION, position)
+                            startService(intent)
                         }
                     }
                 )

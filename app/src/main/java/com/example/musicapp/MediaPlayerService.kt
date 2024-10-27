@@ -20,6 +20,9 @@ class MediaPlayerService : Service() {
         const val ACTION_NEXT = "action_next"
         const val ACTION_PREVIOUS = "action_previous"
         const val EXTRA_AUDIO_FILE_RES_ID = "audio_file_res_id"  // New extra for audio file ID
+        const val ACTION_UPDATE_PROGRESS = "action_update_progress"
+        const val EXTRA_TRACK_POSITION = "track_position"
+        const val EXTRA_TRACK_DURATION = "track_duration"
     }
 
     private var mediaPlayer: MediaPlayer? = null
@@ -27,6 +30,20 @@ class MediaPlayerService : Service() {
     private var currentAudioResId: Int = -1
 
     override fun onBind(p0: Intent?): IBinder? = null
+
+    private val handler = android.os.Handler()
+    private val updateProgressTask = object : Runnable {
+        override fun run() {
+            mediaPlayer?.let {
+                if (isPlaying) {
+                    val currentPosition = it.currentPosition
+                    val duration = it.duration
+                    broadcastProgressUpdate(currentPosition, duration)
+                }
+            }
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     private fun broadcastPlayPauseState() {
         val intent = Intent(if (isPlaying) ACTION_PLAY else ACTION_PAUSE)
@@ -70,6 +87,7 @@ class MediaPlayerService : Service() {
         // Start playback
         mediaPlayer?.start()
         isPlaying = true
+        handler.post(updateProgressTask)
         currentAudioResId = audioResId
         startForegroundService()
         updateNotification()
@@ -79,8 +97,17 @@ class MediaPlayerService : Service() {
     private fun pauseAudio() {
         mediaPlayer?.pause()
         isPlaying = false
+        handler.removeCallbacks(updateProgressTask)
         updateNotification()
         broadcastPlayPauseState()
+    }
+
+    private fun broadcastProgressUpdate(currentPosition: Int, duration: Int) {
+        val intent = Intent(ACTION_UPDATE_PROGRESS).apply {
+            putExtra(EXTRA_TRACK_POSITION, currentPosition)
+            putExtra(EXTRA_TRACK_DURATION, duration)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
     private fun resumeAudio() {
@@ -142,6 +169,7 @@ class MediaPlayerService : Service() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(updateProgressTask)
         mediaPlayer?.release()
         mediaPlayer = null
         super.onDestroy()
