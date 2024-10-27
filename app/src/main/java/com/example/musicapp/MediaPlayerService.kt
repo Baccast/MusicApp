@@ -23,6 +23,8 @@ class MediaPlayerService : Service() {
         const val ACTION_UPDATE_PROGRESS = "action_update_progress"
         const val EXTRA_TRACK_POSITION = "track_position"
         const val EXTRA_TRACK_DURATION = "track_duration"
+        const val ACTION_SEEK = "action_seek"
+        const val EXTRA_SEEK_POSITION = "seek_position"
     }
 
     private var mediaPlayer: MediaPlayer? = null
@@ -64,8 +66,16 @@ class MediaPlayerService : Service() {
             ACTION_PAUSE -> pauseAudio()
             ACTION_NEXT -> nextTrack()  // Handles skipping to next track
             ACTION_PREVIOUS -> previousTrack()  // Handles going to previous track
+            ACTION_SEEK -> {
+                val seekPosition = intent.getIntExtra(EXTRA_SEEK_POSITION, 0)
+                mediaPlayer?.seekTo(seekPosition)
+            }
         }
         return START_STICKY
+    }
+
+    private fun seekAudio(position: Int) {
+        mediaPlayer?.seekTo(position)
     }
 
     private fun startForegroundService() {

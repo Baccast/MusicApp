@@ -188,8 +188,8 @@ class TrackDetailsActivity : ComponentActivity() {
                     trackDuration = trackDuration,
                     onSeek = { position ->
                         Intent(this, MediaPlayerService::class.java).also { intent ->
-//                            intent.action = MediaPlayerService.ACTION_SEEK
-//                            intent.putExtra(MediaPlayerService.EXTRA_SEEK_POSITION, position)
+                            intent.action = MediaPlayerService.ACTION_SEEK
+                            intent.putExtra(MediaPlayerService.EXTRA_SEEK_POSITION, position)
                             startService(intent)
                         }
                     }
