@@ -307,8 +307,6 @@ fun PlaybackScreen(
             }
         }
     }
-
-    Text(text = if (isPlaying) "Playing" else "Paused", fontSize = 18.sp)
 }
 
 fun formatTime(milliseconds: Int): String {
